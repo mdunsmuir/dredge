@@ -1,0 +1,8 @@
+[package]
+name = "dredge"
+version = "0.1.0"
+authors = ["Michael Dunsmuir <michael.dunsmuir@vaisala.com>"]
+
+[dependencies]
+rustbox = "*"
+clap = { version = "2", features = ["unstable"] }
