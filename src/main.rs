@@ -3,13 +3,39 @@ extern crate clap;
 extern crate rustbox;
 
 use std::collections::BTreeMap;
-use std::os::linux::fs::MetadataExt;
 
-/// I'm still totally confused about where this comes from and couldn't find
-/// an API to grab it... maybe in system header files?
-///
-/// ST_BLKSIZE returns the *IO* block size, which is 4096
-const DEVICE_BLOCKSIZE: u64 = 512;
+mod os {
+
+    use std::fs::Metadata;
+
+    /// I'm still totally confused about where this comes from and couldn't find
+    /// an API to grab it... maybe in system header files?
+    ///
+    /// ST_BLKSIZE returns the *IO* block size, which is 4096
+    const DEVICE_BLOCKSIZE: u64 = 512;
+
+    // linux
+
+    #[cfg(target_family = "linux")]
+    use std::os::linux::fs::MetadataExt;
+
+    #[cfg(target_family = "linux")]
+    pub fn size(metadata: &Metadata) -> u64 {
+        metadata.st_blocks() * DEVICE_BLOCKSIZE
+    }
+
+    // unix
+
+    #[cfg(target_family = "unix")]
+    use std::os::unix::fs::MetadataExt;
+
+    #[cfg(target_family = "unix")]
+    pub fn size(metadata: &Metadata) -> u64 {
+        metadata.blocks() * DEVICE_BLOCKSIZE
+    }
+}
+
+const LINE_MAX_WIDTH: usize = 50;
 
 #[derive(Debug)]
 enum Error {
@@ -19,6 +45,7 @@ enum Error {
 
 type Result<T> = std::result::Result<T, Error>;
 type Contents = BTreeMap<std::ffi::OsString, FSTree>;
+type Listing = (std::ffi::OsString, u64);
 
 enum FSTree {
     Dir {
@@ -40,7 +67,7 @@ enum FSTree {
 struct UI<'a> {
     rustbox: &'a rustbox::RustBox,
     stack: Vec<std::ffi::OsString>,
-    listing: Vec<(std::ffi::OsString, u64)>,
+    listing: Vec<Listing>,
     selected: Option<usize>,
     window_top: usize,
 }
@@ -68,8 +95,7 @@ impl FSTree {
     fn size(&self) -> u64 {
         match *self {
             FSTree::Dir { total_size, .. } => total_size,
-            FSTree::File { ref metadata, .. } =>
-                metadata.st_blocks() * DEVICE_BLOCKSIZE,
+            FSTree::File { ref metadata, .. } => os::size(metadata),
             FSTree::Bad => 0,
         }
     }
@@ -97,7 +123,7 @@ impl FSTree {
 
                 ).and_then(|contents| {
                     let num_files = contents.len();
-                    let my_size = md.st_blocks() * DEVICE_BLOCKSIZE;
+                    let my_size = os::size(&md);
                     let total_size = 
                         contents.values()
                                 .fold(0, |cum, fst| fst.size() + cum) + my_size;
@@ -160,6 +186,7 @@ impl<'a> UI<'a> {
         }
 
         self.listing.sort_by_key(|&(_, size)| size );
+        self.listing.reverse();
     }
 
     fn draw(&self) {
@@ -175,27 +202,35 @@ impl<'a> UI<'a> {
 
             Some(i_selected) => {
                 let height = self.rustbox.height();
+                let width = self.rustbox.width();
                 let last_index = // actually last index + 1
                     std::cmp::min((self.window_top + height), self.listing.len());
                 let to_display = 
                     &self.listing[self.window_top..last_index];
 
-                for (i, &(ref name, size)) in to_display.iter().enumerate() {
+                for (i, line) in to_display.iter().enumerate() {
                     let (front, back) = if i + self.window_top  == i_selected {
                         (rustbox::Color::Black, rustbox::Color::White)
                     } else {
-                        (rustbox::Color::White, rustbox::Color::Default)
+                        (rustbox::Color::Default, rustbox::Color::Default)
                     };
 
                     self.rustbox.print(
                         0, i, rustbox::Style::empty(),
-                        front, back, name.to_str().unwrap()
+                        front, back, &self.format_line(line)
                     );
                 }
             }
         }
 
         self.rustbox.present();
+    }
+
+    fn format_line(&self, line: &Listing) -> String {
+        let width = self.rustbox.width();
+        let (ref name, size) = *line;
+        let size_mb = size as f64 / 1000000.0;
+        format!("{:<30}{:>10.1} M", name.to_str().unwrap(), size_mb)
     }
 }
 
