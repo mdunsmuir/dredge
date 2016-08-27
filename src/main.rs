@@ -75,7 +75,7 @@ impl FSTree {
     }
 
     fn from_root(path: &std::path::PathBuf) -> Result<Contents> {
-        let md = match std::fs::metadata(path) {
+        match std::fs::metadata(path) {
             Ok(md) => if md.is_dir() {
                 md
             } else {
