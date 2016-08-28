@@ -84,6 +84,25 @@ impl FSTree {
     pub fn delete(contents: &mut Contents, path: &[OsString]) -> Option<u64> {
         if path.is_empty() {
             panic!("cannot delete empty path")
+
+        } else if path.len() == 1 {
+            let name = path.first().unwrap();
+
+            let info = contents.get(name)
+                               .and_then(|fst| 
+                fst.path().map(|p| (p.clone(), fst.size()) ) 
+            );
+
+            if let Some((pb, size)) = info {
+                std::fs::remove_file(pb).ok().map(|_| {
+                    contents.remove(name);
+                    size
+                })
+
+            } else {
+                None
+            }
+
         } else {
             path.first()
                 .and_then(|name| contents.get_mut(name) )
@@ -97,14 +116,23 @@ impl FSTree {
 
         } else if path.len() == 1 {
             let name = path.first().unwrap();
-            let contents = match *self {
-                FSTree::Dir { ref contents, .. } => contents,
+
+            let mut contents = match *self {
+                FSTree::Dir { ref mut contents, .. } => contents,
                 _ => panic!("expected Dir"),
             };
 
-            if let Some((pb, size)) =
-                contents.get(name).and_then(|fst| fst.path().map(|p| (p, fst.size()) ) ) {
-                std::fs::remove_file(pb).ok().map(|_| size)
+            let info = contents.get(name)
+                               .and_then(|fst| 
+                fst.path().map(|p| (p.clone(), fst.size()) ) 
+            );
+
+            if let Some((pb, size)) = info {
+                std::fs::remove_file(pb).ok().map(|_| {
+                    contents.remove(name);
+                    size
+                })
+
             } else {
                 None
             }

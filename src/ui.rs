@@ -103,10 +103,13 @@ impl<'a> UI<'a> {
 
                 Ok(KeyEvent(Char('d'))) => {
                     if let Some(pos) = self.selected {
-                        let ref name = self.listing[pos].0;
-                        self.stack.push(name.clone());
-                        FSTree::delete(fsts, self.stack.as_slice());
-                        self.stack.pop();
+                        {
+                            let ref name = self.listing[pos].0;
+                            self.stack.push(name.clone());
+                            FSTree::delete(fsts, self.stack.as_slice());
+                            self.stack.pop();
+                        }
+                        self.load(fsts);
                     }
                 }
 
