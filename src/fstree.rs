@@ -1,9 +1,10 @@
 extern crate std;
 
+use std::ffi::OsString;
 use std::collections::BTreeMap;
 use super::*;
 
-pub type Contents = BTreeMap<std::ffi::OsString, FSTree>;
+pub type Contents = BTreeMap<OsString, FSTree>;
 
 pub enum FSTree {
     Dir {
@@ -49,6 +50,14 @@ impl FSTree {
         }
     }
 
+    pub fn path(&self) -> Option<&std::path::PathBuf> {
+        match *self {
+            FSTree::Dir { ref path, .. } => Some(path),
+            FSTree::File { ref path, .. } => Some(path),
+            FSTree::Bad => None,
+        }
+    }
+
     pub fn size(&self) -> u64 {
         match *self {
             FSTree::Dir { total_size, .. } => total_size,
@@ -72,7 +81,54 @@ impl FSTree {
                                .map_err(|e| Error::IO(e) )
     }
 
-    pub fn new(entry: std::fs::DirEntry) -> FSTree {
+    pub fn delete(contents: &mut Contents, path: &[OsString]) -> Option<u64> {
+        if path.is_empty() {
+            panic!("cannot delete empty path")
+        } else {
+            path.first()
+                .and_then(|name| contents.get_mut(name) )
+                .and_then(|fst| fst._delete(&path[1..]) )
+        }
+    }
+
+    fn _delete(&mut self, path: &[OsString]) -> Option<u64> {
+        if path.is_empty() {
+            panic!("cannot delete empty path");
+
+        } else if path.len() == 1 {
+            let name = path.first().unwrap();
+            let contents = match *self {
+                FSTree::Dir { ref contents, .. } => contents,
+                _ => panic!("expected Dir"),
+            };
+
+            if let Some((pb, size)) =
+                contents.get(name).and_then(|fst| fst.path().map(|p| (p, fst.size()) ) ) {
+                std::fs::remove_file(pb).ok().map(|_| size)
+            } else {
+                None
+            }
+
+        } else {
+            let name = path.first().unwrap();
+            let (contents, total_size) = match *self {
+                FSTree::Dir { ref mut contents, ref mut total_size, .. } =>
+                    (contents, total_size),
+                _ => panic!("expected Dir"),
+            };
+
+            match contents.get_mut(name) {
+                Some(fst) =>
+                    fst._delete(&path[1..]).map(|size_deleted| {
+                        *total_size -= size_deleted;
+                        size_deleted
+                    }),
+                _ => panic!("expected Some"),
+            }
+        }
+    }
+
+    fn new(entry: std::fs::DirEntry) -> FSTree {
         entry.metadata().and_then(|md|
             if md.is_dir() {
                 std::fs::read_dir(entry.path()).and_then::<Contents, _>(|entries|

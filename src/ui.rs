@@ -2,6 +2,9 @@ extern crate std;
 
 use super::*;
 
+use rustbox::Event::KeyEvent;
+use rustbox::keyboard::Key::*;
+
 const LINE_MAX_WIDTH: usize = 50;
 
 type Listing = (std::ffi::OsString, u64, bool);
@@ -58,9 +61,9 @@ impl<'a> UI<'a> {
             self.draw();
 
             match self.rustbox.poll_event(false) {
-                Ok(rustbox::Event::KeyEvent(rustbox::keyboard::Key::Char('q'))) => break,
+                Ok(KeyEvent(Char('q'))) => break,
 
-                Ok(rustbox::Event::KeyEvent(rustbox::keyboard::Key::Char('k'))) => {
+                Ok(KeyEvent(Char('k'))) => {
                     let mut o_cur = std::mem::replace(&mut self.selected, None);
 
                     self.selected = o_cur.map(|cur| if cur > 0 {
@@ -70,7 +73,7 @@ impl<'a> UI<'a> {
                     });
                 },
 
-                Ok(rustbox::Event::KeyEvent(rustbox::keyboard::Key::Char('j'))) => {
+                Ok(KeyEvent(Char('j'))) => {
                     let mut o_cur = std::mem::replace(&mut self.selected, None);
 
                     self.selected = o_cur.map(|cur|
@@ -78,28 +81,34 @@ impl<'a> UI<'a> {
                     );
                 },
 
-                Ok(rustbox::Event::KeyEvent(rustbox::keyboard::Key::Char('l'))) => {
-                    match self.selected {
-                        None => (),
-                        Some(pos) => {
-                            let (name, is_dir) = {
-                                let ref target = self.listing[pos];
-                                (target.0.clone(), target.2)
-                            };
+                Ok(KeyEvent(Char('l'))) => {
+                    if let Some(pos) = self.selected {
+                        let (name, is_dir) = {
+                            let ref target = self.listing[pos];
+                            (target.0.clone(), target.2)
+                        };
 
-                            if is_dir {
-                                self.stack.push(name);
-                                self.load(fsts);
-                            }  
-                        }
+                        if is_dir {
+                            self.stack.push(name);
+                            self.load(fsts);
+                        }  
                     }
                 }
 
-                Ok(rustbox::Event::KeyEvent(rustbox::keyboard::Key::Char('h'))) => {
+                Ok(KeyEvent(Char('h'))) => {
                     if let Some(_) = self.stack.pop() {
                         self.load(fsts);
                     }
                 },
+
+                Ok(KeyEvent(Char('d'))) => {
+                    if let Some(pos) = self.selected {
+                        let ref name = self.listing[pos].0;
+                        self.stack.push(name.clone());
+                        FSTree::delete(fsts, self.stack.as_slice());
+                        self.stack.pop();
+                    }
+                }
 
                 _ => (),
             }
