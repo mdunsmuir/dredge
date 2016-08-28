@@ -45,7 +45,7 @@ enum Error {
 
 type Result<T> = std::result::Result<T, Error>;
 type Contents = BTreeMap<std::ffi::OsString, FSTree>;
-type Listing = (std::ffi::OsString, u64);
+type Listing = (std::ffi::OsString, u64, bool);
 
 enum FSTree {
     Dir {
@@ -88,6 +88,13 @@ impl FSTree {
     fn is_bad(&self) -> bool {
         match *self {
             FSTree::Bad => true,
+            _ => false,
+        }
+    }
+
+    fn is_dir(&self) -> bool {
+        match *self {
+            FSTree::Dir { .. } => true,
             _ => false,
         }
     }
@@ -181,11 +188,11 @@ impl<'a> UI<'a> {
             self.selected = Some(0);
 
             for (name, fst) in fsts {
-                self.listing.push((name.clone(), fst.size()));
+                self.listing.push((name.clone(), fst.size(), fst.is_dir()));
             }
         }
 
-        self.listing.sort_by_key(|&(_, size)| size );
+        self.listing.sort_by_key(|&(_, size, _)| size );
         self.listing.reverse();
     }
 
@@ -228,9 +235,14 @@ impl<'a> UI<'a> {
 
     fn format_line(&self, line: &Listing) -> String {
         let width = self.rustbox.width();
-        let (ref name, size) = *line;
+        let (ref name, size, is_dir) = *line;
         let size_mb = size as f64 / 1000000.0;
-        format!("{:<30}{:>10.1} M", name.to_str().unwrap(), size_mb)
+
+        if is_dir {
+            format!("{:<28}->{:>10.1} M", name.to_str().unwrap(), size_mb)
+        } else {
+            format!("{:<30}{:>10.1} M", name.to_str().unwrap(), size_mb)
+        }
     }
 }
 
@@ -246,7 +258,11 @@ fn main() {
 
     println!("loading...");
     let mut fsts = FSTree::from_root(&path).unwrap();
-    let rustbox = rustbox::RustBox::init(rustbox::InitOptions::default()).unwrap();
+
+    let mut opts = rustbox::InitOptions::default();
+    opts.buffer_stderr = true;
+    let rustbox = rustbox::RustBox::init(opts).unwrap();
+
     let mut ui_state = UI::new(&rustbox, &fsts);
 
     loop {
@@ -266,6 +282,29 @@ fn main() {
                 ui_state.selected = o_cur.map(|cur|
                     std::cmp::min(ui_state.listing.len() - 1, cur + 1)
                 );
+            },
+
+            Ok(rustbox::Event::KeyEvent(rustbox::keyboard::Key::Char('l'))) => {
+                match ui_state.selected {
+                    None => (),
+                    Some(pos) => {
+                        let (name, is_dir) = {
+                            let ref target = ui_state.listing[pos];
+                            (target.0.clone(), target.2)
+                        };
+
+                        if is_dir {
+                            ui_state.stack.push(name);
+                            ui_state.load(&fsts);
+                        }  
+                    }
+                }
+            }
+
+            Ok(rustbox::Event::KeyEvent(rustbox::keyboard::Key::Char('h'))) => {
+                if let Some(_) = ui_state.stack.pop() {
+                    ui_state.load(&fsts);
+                }
             },
 
             _ => (),
