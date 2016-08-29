@@ -7,9 +7,8 @@ use rustbox::keyboard::Key::*;
 
 const LINE_MAX_WIDTH: usize = 50;
 
-type Listing = (std::ffi::OsString, u64, bool);
-
 pub struct UI<'a> {
+    fst: FSTree,
     rustbox: &'a rustbox::RustBox,
     stack: Vec<std::ffi::OsString>,
     listing: Vec<Listing>,
@@ -19,8 +18,9 @@ pub struct UI<'a> {
 
 impl<'a> UI<'a> {
 
-    pub fn new(rustbox: &'a rustbox::RustBox, fsts: &Contents) -> Self {
+    pub fn new(rustbox: &'a rustbox::RustBox, fsts: FSTree) -> Self {
         let mut ui = UI {
+            fst: fsts,
             rustbox: rustbox,
             stack: Vec::new(),
             listing: Vec::new(),
@@ -28,35 +28,29 @@ impl<'a> UI<'a> {
             window_top: 0,
         };
 
-        ui.load(fsts);
+        ui.load();
         ui
     }
 
-    pub fn load(&mut self, mut fsts: &Contents) {
-        self.listing.clear();
+    pub fn load(&mut self) {
+        let mut fst = &self.fst;
 
         for name in self.stack.iter() {
-            fsts = match *fsts.get(name).unwrap() {
-                FSTree::Dir { ref contents, .. } => contents,
-                _ => panic!("expected Dir"),
-            };
+            fst = fst.entry(name).unwrap();
         }
 
-        if fsts.is_empty() {
+        if fst.is_empty().unwrap() {
             self.selected = None;
         } else {
             self.selected = Some(0);
-
-            for (name, fst) in fsts {
-                self.listing.push((name.clone(), fst.size(), fst.is_dir()));
-            }
+            self.listing = fst.list().unwrap();
         }
 
         self.listing.sort_by_key(|&(_, size, _)| size );
         self.listing.reverse();
     }
 
-    pub fn event_loop(&mut self, fsts: &mut Contents) {
+    pub fn event_loop(&mut self) {
         loop {
             self.draw();
 
@@ -90,28 +84,16 @@ impl<'a> UI<'a> {
 
                         if is_dir {
                             self.stack.push(name);
-                            self.load(fsts);
+                            self.load();
                         }  
                     }
                 }
 
                 Ok(KeyEvent(Char('h'))) => {
                     if let Some(_) = self.stack.pop() {
-                        self.load(fsts);
+                        self.load();
                     }
                 },
-
-                Ok(KeyEvent(Char('d'))) => {
-                    if let Some(pos) = self.selected {
-                        {
-                            let ref name = self.listing[pos].0;
-                            self.stack.push(name.clone());
-                            FSTree::delete(fsts, self.stack.as_slice());
-                            self.stack.pop();
-                        }
-                        self.load(fsts);
-                    }
-                }
 
                 _ => (),
             }

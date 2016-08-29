@@ -2,11 +2,11 @@
 extern crate clap;
 pub extern crate rustbox;
 
-pub mod fstree;
+pub mod fstree2;
 pub mod os;
 pub mod ui;
 
-pub use fstree::*;
+pub use fstree2::*;
 pub use ui::*;
 
 #[derive(Debug)]
@@ -28,13 +28,12 @@ fn main() {
     let path = std::path::PathBuf::from(args.value_of("PATH").unwrap());
 
     println!("loading...");
-    let mut fsts = FSTree::from_root(&path).unwrap();
+    let mut fsts = FSTree::from_dir(&path).unwrap();
 
     let mut opts = rustbox::InitOptions::default();
     opts.buffer_stderr = true;
     let rustbox = rustbox::RustBox::init(opts).unwrap();
 
-    let mut ui = UI::new(&rustbox, &fsts);
-    ui.event_loop(&mut fsts);
+    let mut ui = UI::new(&rustbox, fsts);
+    ui.event_loop();
 }
-
