@@ -2,11 +2,11 @@
 extern crate clap;
 pub extern crate rustbox;
 
-pub mod fstree2;
+pub mod fstree;
 pub mod os;
 pub mod ui;
 
-pub use fstree2::*;
+pub use fstree::*;
 pub use ui::*;
 
 #[derive(Debug)]
