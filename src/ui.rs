@@ -143,9 +143,9 @@ impl<'a> UI<'a> {
         let size_mb = size as f64 / 1000000.0;
 
         if is_dir {
-            format!("{:<28}->{:>10.1} M", name.to_str().unwrap(), size_mb)
+            format!("{:<48}->{:>10.1} M", name.to_str().unwrap(), size_mb)
         } else {
-            format!("{:<30}{:>10.1} M", name.to_str().unwrap(), size_mb)
+            format!("{:<50}{:>10.1} M", name.to_str().unwrap(), size_mb)
         }
     }
 }
