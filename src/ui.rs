@@ -120,16 +120,7 @@ impl<'a> UI<'a> {
                     &self.listing[self.window_top..last_index];
 
                 for (i, line) in to_display.iter().enumerate() {
-                    let (front, back) = if i + self.window_top  == i_selected {
-                        (rustbox::Color::Black, rustbox::Color::White)
-                    } else {
-                        (rustbox::Color::Default, rustbox::Color::Default)
-                    };
-
-                    self.rustbox.print(
-                        0, i, rustbox::Style::empty(),
-                        front, back, &self.format_line(line)
-                    );
+                    self.draw_line(i, i + self.window_top == i_selected, line);
                 }
             }
         }
@@ -137,15 +128,62 @@ impl<'a> UI<'a> {
         self.rustbox.present();
     }
 
-    fn format_line(&self, line: &Listing) -> String {
-        let width = self.rustbox.width();
-        let (ref name, size, is_dir) = *line;
-        let size_mb = size as f64 / 1000000.0;
+    fn draw_line(&self, y: usize, selected: bool, listing: &Listing) {
+        let (ref name, size, is_dir) = *listing;
 
-        if is_dir {
-            format!("{:<48}->{:>10.1} M", name.to_str().unwrap(), size_mb)
+        // set colors depending on whether this line is selected
+        let (front, back) = if selected {
+            (rustbox::Color::Black, rustbox::Color::White)
         } else {
-            format!("{:<50}{:>10.1} M", name.to_str().unwrap(), size_mb)
+            (rustbox::Color::Default, rustbox::Color::Default)
+        };
+
+        // create the string for the size and directory indicator
+        let size_str = Self::format_size(size);
+        let size_and_dir_marker = if is_dir {
+            format!("-> {:>}", size_str)
+        } else {
+            format!("   {:>}", size_str)
+        };
+
+        let size_str_x = self.rustbox.width() - size_and_dir_marker.len();
+
+        // name on the left
+        self.rustbox.print(
+            0, y, rustbox::Style::empty(),
+            front, back, name.to_str().unwrap()
+        );
+
+        // size on the right
+        self.rustbox.print(
+            size_str_x, y, rustbox::Style::empty(),
+            front, back, &size_and_dir_marker
+        );
+
+        if selected {
+            for col in name.to_str().unwrap().len()..size_str_x {
+                self.rustbox.print_char(
+                    col, y, rustbox::Style::empty(),
+                    front, back, ' '
+                )
+            }
         }
+    }
+
+    fn format_size(size: u64) -> String {
+        if size == 0 {
+            return format!("{:>} {}", 0, 'B');
+        }
+
+        let (prefix, power) = match (size as f64).log(1000.0).floor() as i32 {
+            0 => ('B', 0),
+            1 => ('K', 1),
+            2 => ('M', 2),
+            3 => ('G', 3),
+            x if x > 3 => ('T', 3),
+            _ => ('B', 0),
+        };
+
+        format!("{:>10.1} {}", size as f64 / (1000.0 as f64).powi(power), prefix)
     }
 }
