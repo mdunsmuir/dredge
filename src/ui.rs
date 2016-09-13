@@ -57,23 +57,8 @@ impl<'a> UI<'a> {
             match self.rustbox.poll_event(false) {
                 Ok(KeyEvent(Char('q'))) => break,
 
-                Ok(KeyEvent(Char('k'))) => {
-                    let mut o_cur = std::mem::replace(&mut self.selected, None);
-
-                    self.selected = o_cur.map(|cur| if cur > 0 {
-                        cur - 1
-                    } else { 
-                        cur 
-                    });
-                },
-
-                Ok(KeyEvent(Char('j'))) => {
-                    let mut o_cur = std::mem::replace(&mut self.selected, None);
-
-                    self.selected = o_cur.map(|cur|
-                        std::cmp::min(self.listing.len() - 1, cur + 1)
-                    );
-                },
+                Ok(KeyEvent(Char('k'))) => self.scroll(-1),
+                Ok(KeyEvent(Char('j'))) => self.scroll(1),
 
                 Ok(KeyEvent(Char('l'))) => {
                     if let Some(pos) = self.selected {
@@ -96,6 +81,37 @@ impl<'a> UI<'a> {
                 },
 
                 _ => (),
+            }
+        }
+    }
+
+    fn scroll(&mut self, distance: i32) {
+        if let Some(selected) = self.selected.take() {
+            let new_selected =
+                std::cmp::max(
+                    0,
+                    std::cmp::min(
+                        self.listing.len() as i32 - 1,
+                        selected as i32 + distance
+                    )
+                ) as usize;
+
+            self.selected = Some(new_selected);
+            self.align_viewport();
+        }
+    }
+
+    // if the selected line has gone off the screen, we need to re-align the
+    // viewport to make it visible again.
+    fn align_viewport(&mut self) {
+        let height = self.rustbox.height();
+
+        if let Some(selected) = self.selected {
+            if selected < self.window_top {
+                self.window_top = selected;
+
+            } else if selected >= self.window_top + height {
+                self.window_top = selected - height + 1;
             }
         }
     }
