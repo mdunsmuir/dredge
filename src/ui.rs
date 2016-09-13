@@ -60,6 +60,9 @@ impl<'a> UI<'a> {
                 Ok(KeyEvent(Char('k'))) => self.scroll(-1),
                 Ok(KeyEvent(Char('j'))) => self.scroll(1),
 
+                Ok(KeyEvent(PageUp))  => self.scroll(-(self.rustbox.height() as i32)),
+                Ok(KeyEvent(PageDown))  => self.scroll(self.rustbox.height() as i32),
+
                 Ok(KeyEvent(Char('l'))) => {
                     if let Some(pos) = self.selected {
                         let (name, is_dir) = {
@@ -104,7 +107,7 @@ impl<'a> UI<'a> {
     // if the selected line has gone off the screen, we need to re-align the
     // viewport to make it visible again.
     fn align_viewport(&mut self) {
-        let height = self.rustbox.height();
+        let height = self.rustbox.height() - 1; // minus one for status bar
 
         if let Some(selected) = self.selected {
             if selected < self.window_top {
@@ -128,7 +131,8 @@ impl<'a> UI<'a> {
             ),
 
             Some(i_selected) => {
-                let height = self.rustbox.height();
+                // subtract one so the status bar fits
+                let height = self.rustbox.height() - 1;
                 let width = self.rustbox.width();
                 let last_index = // actually last index + 1
                     std::cmp::min((self.window_top + height), self.listing.len());
@@ -136,12 +140,31 @@ impl<'a> UI<'a> {
                     &self.listing[self.window_top..last_index];
 
                 for (i, line) in to_display.iter().enumerate() {
-                    self.draw_line(i, i + self.window_top == i_selected, line);
+                    self.draw_line(i + 1, i + self.window_top == i_selected, line);
                 }
             }
         }
 
+        self.draw_status_bar(0);
         self.rustbox.present();
+    }
+
+    fn draw_status_bar(&self, y: usize) {
+        let status_str = format!("Total Size: {}",
+                                 Self::format_size(self.fst.size().unwrap()));
+
+        self.rustbox.print(
+            0, y, rustbox::Style::empty(),
+            rustbox::Color::Default, rustbox::Color::Red,
+            &status_str
+        );
+
+        for col in status_str.len()..self.rustbox.width() {
+            self.rustbox.print_char(
+                col, y, rustbox::Style::empty(),
+                rustbox::Color::Default, rustbox::Color::Red, ' '
+            )
+        }
     }
 
     fn draw_line(&self, y: usize, selected: bool, listing: &Listing) {
