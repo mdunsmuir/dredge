@@ -223,6 +223,66 @@ impl FSTree {
             n_contents.get_map().is_empty()
         )
     }
+
+    pub fn delete_path(&mut self, names: &[OsString]) -> Option<u64> {
+        if names.is_empty() {
+            panic!("cannot delete empty path");
+
+        } else {
+            let name = names.first().unwrap();
+            let others = &names[1..];
+
+            if names.len() == 1 { // delete from this level
+                let o_deleted_size = self.contents().map(|cs| cs.get_map() ).and_then(|map| {
+                    map.get(name)
+                }).and_then(|fst| {
+                    let fst_size = fst.size();
+                    fst.delete().ok().and_then(|_| fst_size )
+                });
+
+                /*
+                let deleted_size = self.contents_mut().map(|cs| cs.get_map_mut() ).and_then(|map| {
+                    map.remove(name)
+                }).and_then(|fst| {
+                    let fst_size = fst.size();
+                    fst.delete().ok().and_then(|_| fst_size )
+                });
+                */
+
+                o_deleted_size.map(|size| {
+                    *self.total_size_mut().unwrap() -= size;
+
+                    self.contents_mut().map(|cs| cs.get_map_mut() ).and_then(|map| {
+                        map.remove(name)
+                    });
+
+                    *self.total_size().unwrap()
+                })
+
+            } else { // go deeper to delete
+                let mut cur_size = None;
+
+                // recursive call to delete
+                let new_size = self.entry_mut(name) .and_then(|fst| {
+                    cur_size = fst.size();
+                    fst.delete_path(others)
+                });
+
+                // now that we have the new size, update this node and pass
+                // *its* new size on down the line
+                new_size.map(|new_size| {
+                    let size_delta = cur_size.unwrap() - new_size;
+                    *self.total_size_mut().unwrap() -= size_delta;
+                    *self.total_size().unwrap()
+                })
+            }
+        }
+    }
+
+    fn delete(&self) -> std::io::Result<()> {
+        //Err(std::io::Error::new(std::io::ErrorKind::Other, "uh oh"))
+        Ok(())
+    }
 }
 
 #[cfg(test)]

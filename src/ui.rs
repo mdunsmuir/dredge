@@ -31,28 +31,32 @@ impl<'a> UI<'a> {
     }
 
     pub fn load(&mut self) {
-        // this poor tortured if statement exists to avoid borrow conflicts
-        if {
-            let mut fst = self.fst.entries(self.stack.as_slice()).unwrap();
-
-            if !fst.is_empty().unwrap() {
-
-                self.listing = fst.list().unwrap();
-
-                true
-            } else {
-                false
-            }
-
-        } { // this is the "then" block...
-            let selected = self.selected_mut();
-            if selected.is_none() {
-                *selected = Some(0);
-            }
-        }
+        self.listing = self.fst.entries(self.stack.as_slice())
+                               .and_then(|fst| fst.list() )
+                               .unwrap();
 
         self.listing.sort_by_key(|&(_, size, _)| size );
         self.listing.reverse();
+
+        if !self.listing.is_empty() { // if there are items to show
+            let n_listings = self.listing.len();
+            let selected = self.selected_mut();
+
+            // if no previous selection (i.e. we came from above) then we
+            // start with the first item selected (otherwise remember previous)
+            if selected.is_none() {
+                *selected = Some(0);
+            }
+
+            // we might be off the end of the list... if so, bump up
+            selected.take().map(|pos|
+                *selected = Some(std::cmp::min(n_listings - 1, pos))
+            );
+
+        } else { // if no items to show, make sure
+                 // we don't think anything is selected
+            *self.selected_mut() = None;
+        }
     }
 
     pub fn event_loop(&mut self) {
@@ -86,6 +90,15 @@ impl<'a> UI<'a> {
                 Ok(KeyEvent(Char('h'))) => {
                     if let Some(_) = self.stack.pop() {
                         self.selected.pop();
+                        self.load();
+                    }
+                },
+
+                Ok(KeyEvent(Char('d'))) => {
+                    if let &Some(pos) = self.selected() {
+                        self.stack.push(self.listing[pos].0.clone());
+                        self.fst.delete_path(self.stack.as_slice());
+                        self.stack.pop();
                         self.load();
                     }
                 },
@@ -145,7 +158,7 @@ impl<'a> UI<'a> {
 
         match self.selected().as_ref() {
             None => self.rustbox.print(
-                0, 0, rustbox::Style::empty(),
+                0, 1, rustbox::Style::empty(),
                 rustbox::Color::White,
                 rustbox::Color::Default,
                 "<no files>"
