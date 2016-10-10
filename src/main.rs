@@ -9,14 +9,6 @@ pub mod ui;
 pub use fstree::*;
 pub use ui::*;
 
-#[derive(Debug)]
-pub enum Error {
-    RootIsNotDirectory,
-    IO(std::io::Error),
-}
-
-pub type Result<T> = std::result::Result<T, Error>;
-
 fn main() {
     let args = clap_app!(app =>
         (version: crate_version!())
@@ -28,7 +20,7 @@ fn main() {
     let path = std::path::PathBuf::from(args.value_of("PATH").unwrap());
 
     println!("loading...");
-    let mut fsts = FSTree::from_dir(&path).unwrap();
+    let fsts = FSTree::from_dir(&path).unwrap();
 
     let mut opts = rustbox::InitOptions::default();
     opts.buffer_stderr = true;

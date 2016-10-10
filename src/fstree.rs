@@ -206,18 +206,6 @@ impl FSTree {
         })
     }
 
-    pub fn entries_mut(&mut self, names: &[OsString]) -> Option<&mut FSTree> {
-        let mut fst = Some(self);
-
-        for name in names {
-            let cur = fst.take();
-            fst = cur.map(|fst| fst.entry_mut(name) )
-                     .unwrap_or_else(|| return None )
-        }
-
-        fst
-    }
-
     pub fn is_empty(&self) -> Option<bool> {
         self.contents().map(|n_contents|
             n_contents.get_map().is_empty()
@@ -239,15 +227,6 @@ impl FSTree {
                     let fst_size = fst.size();
                     fst.delete().ok().and_then(|_| fst_size )
                 });
-
-                /*
-                let deleted_size = self.contents_mut().map(|cs| cs.get_map_mut() ).and_then(|map| {
-                    map.remove(name)
-                }).and_then(|fst| {
-                    let fst_size = fst.size();
-                    fst.delete().ok().and_then(|_| fst_size )
-                });
-                */
 
                 o_deleted_size.map(|size| {
                     *self.total_size_mut().unwrap() -= size;
@@ -282,14 +261,5 @@ impl FSTree {
     fn delete(&self) -> std::io::Result<()> {
         //Err(std::io::Error::new(std::io::ErrorKind::Other, "uh oh"))
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod test {
-
-    #[test]
-    fn it_works() {
-        assert!(true);
     }
 }
