@@ -56,6 +56,11 @@ impl Contents {
         let Contents(ref map) = *self;
         map
     }
+
+    fn get_map_mut(&mut self) -> &mut BTreeMap<OsString, FSTree> {
+        let Contents(ref mut map) = *self;
+        map
+    }
 }
 
 macro_rules! fst_accessor {
@@ -180,6 +185,37 @@ impl FSTree {
             let contents = n_contents.get_map();
             contents.get(name)
         })
+    }
+
+    pub fn entries(&self, names: &[OsString]) -> Option<&FSTree> {
+        let mut fst = Some(self);
+
+        for name in names {
+            let cur = fst.take();
+            fst = cur.map(|fst| fst.entry(name) )
+                .unwrap_or_else(|| return None )
+        }
+
+        fst
+    }
+
+    pub fn entry_mut(&mut self, name: &OsString) -> Option<&mut FSTree> {
+        self.contents_mut().and_then(|n_contents| {
+            let contents = n_contents.get_map_mut();
+            contents.get_mut(name)
+        })
+    }
+
+    pub fn entries_mut(&mut self, names: &[OsString]) -> Option<&mut FSTree> {
+        let mut fst = Some(self);
+
+        for name in names {
+            let cur = fst.take();
+            fst = cur.map(|fst| fst.entry_mut(name) )
+                     .unwrap_or_else(|| return None )
+        }
+
+        fst
     }
 
     pub fn is_empty(&self) -> Option<bool> {

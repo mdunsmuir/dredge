@@ -33,11 +33,7 @@ impl<'a> UI<'a> {
     pub fn load(&mut self) {
         // this poor tortured if statement exists to avoid borrow conflicts
         if {
-            let mut fst = &self.fst;
-
-            for name in self.stack.iter() {
-                fst = fst.entry(name).unwrap();
-            }
+            let mut fst = self.fst.entries(self.stack.as_slice()).unwrap();
 
             if !fst.is_empty().unwrap() {
 
