@@ -5,14 +5,12 @@ use super::*;
 use rustbox::Event::KeyEvent;
 use rustbox::keyboard::Key::*;
 
-const LINE_MAX_WIDTH: usize = 50;
-
 pub struct UI<'a> {
     fst: FSTree,
     rustbox: &'a rustbox::RustBox,
     stack: Vec<std::ffi::OsString>,
     listing: Vec<Listing>,
-    selected: Option<usize>,
+    selected: Vec<Option<usize>>,
     window_top: usize,
 }
 
@@ -24,7 +22,7 @@ impl<'a> UI<'a> {
             rustbox: rustbox,
             stack: Vec::new(),
             listing: Vec::new(),
-            selected: None,
+            selected: vec![None],
             window_top: 0,
         };
 
@@ -33,17 +31,28 @@ impl<'a> UI<'a> {
     }
 
     pub fn load(&mut self) {
-        let mut fst = &self.fst;
+        // this poor tortured if statement exists to avoid borrow conflicts
+        if {
+            let mut fst = &self.fst;
 
-        for name in self.stack.iter() {
-            fst = fst.entry(name).unwrap();
-        }
+            for name in self.stack.iter() {
+                fst = fst.entry(name).unwrap();
+            }
 
-        if fst.is_empty().unwrap() {
-            self.selected = None;
-        } else {
-            self.selected = Some(0);
-            self.listing = fst.list().unwrap();
+            if !fst.is_empty().unwrap() {
+
+                self.listing = fst.list().unwrap();
+
+                true
+            } else {
+                false
+            }
+
+        } { // this is the "then" block...
+            let selected = self.selected_mut();
+            if selected.is_none() {
+                *selected = Some(0);
+            }
         }
 
         self.listing.sort_by_key(|&(_, size, _)| size );
@@ -64,7 +73,7 @@ impl<'a> UI<'a> {
                 Ok(KeyEvent(PageDown))  => self.scroll(self.rustbox.height() as i32),
 
                 Ok(KeyEvent(Char('l'))) => {
-                    if let Some(pos) = self.selected {
+                    if let &Some(pos) = self.selected() {
                         let (name, is_dir) = {
                             let ref target = self.listing[pos];
                             (target.0.clone(), target.2)
@@ -72,6 +81,7 @@ impl<'a> UI<'a> {
 
                         if is_dir {
                             self.stack.push(name);
+                            self.selected.push(None);
                             self.load();
                         }  
                     }
@@ -79,6 +89,7 @@ impl<'a> UI<'a> {
 
                 Ok(KeyEvent(Char('h'))) => {
                     if let Some(_) = self.stack.pop() {
+                        self.selected.pop();
                         self.load();
                     }
                 },
@@ -88,20 +99,34 @@ impl<'a> UI<'a> {
         }
     }
 
+    fn selected(&self) -> &Option<usize> {
+        // unwrapping in these methods should be fine because we well always
+        // have at least one level pushed to the line selection stack
+        // (even if the value is `None`)
+        self.selected.last().unwrap()
+    }
+
+    fn selected_mut(&mut self) -> &mut Option<usize> {
+        self.selected.last_mut().unwrap()
+    }
+
     fn scroll(&mut self, distance: i32) {
-        if let Some(selected) = self.selected.take() {
+        let listing_len = self.listing.len();
+
+        if let Some(selected) = self.selected_mut().as_mut() {
             let new_selected =
                 std::cmp::max(
                     0,
                     std::cmp::min(
-                        self.listing.len() as i32 - 1,
-                        selected as i32 + distance
+                        listing_len as i32 - 1,
+                        *selected as i32 + distance
                     )
                 ) as usize;
 
-            self.selected = Some(new_selected);
-            self.align_viewport();
+            *selected = new_selected;
         }
+
+        self.align_viewport();
     }
 
     // if the selected line has gone off the screen, we need to re-align the
@@ -109,7 +134,7 @@ impl<'a> UI<'a> {
     fn align_viewport(&mut self) {
         let height = self.rustbox.height() - 1; // minus one for status bar
 
-        if let Some(selected) = self.selected {
+        if let Some(&selected) = self.selected().as_ref() {
             if selected < self.window_top {
                 self.window_top = selected;
 
@@ -122,7 +147,7 @@ impl<'a> UI<'a> {
     fn draw(&self) {
         self.rustbox.clear();
 
-        match self.selected {
+        match self.selected().as_ref() {
             None => self.rustbox.print(
                 0, 0, rustbox::Style::empty(),
                 rustbox::Color::White,
@@ -130,10 +155,9 @@ impl<'a> UI<'a> {
                 "<no files>"
             ),
 
-            Some(i_selected) => {
+            Some(&i_selected) => {
                 // subtract one so the status bar fits
                 let height = self.rustbox.height() - 1;
-                let width = self.rustbox.width();
                 let last_index = // actually last index + 1
                     std::cmp::min((self.window_top + height), self.listing.len());
                 let to_display = 
