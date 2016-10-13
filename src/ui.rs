@@ -61,6 +61,7 @@ impl<'a> UI<'a> {
 
     pub fn event_loop(&mut self) {
         loop {
+            self.align_viewport();
             self.draw();
 
             match self.rustbox.poll_event(false) {
@@ -94,18 +95,56 @@ impl<'a> UI<'a> {
                     }
                 },
 
-                Ok(KeyEvent(Char('d'))) => {
-                    if let &Some(pos) = self.selected() {
-                        self.stack.push(self.listing[pos].0.clone());
-                        self.fst.delete_path(self.stack.as_slice());
-                        self.stack.pop();
-                        self.load();
-                    }
-                },
+                Ok(KeyEvent(Char('d'))) => self.delete(),
 
                 _ => (),
             }
         }
+    }
+
+    fn delete(&mut self) {
+        // get the current selection position, or no-op if nothing is
+        // selected (indicative of empty dir)
+        let pos = match *self.selected() {
+            None => return,
+            Some(pos) => pos,
+        };
+
+        // clear screen and show the prompt
+        self.rustbox.clear();
+        self.draw_status_bar(0);
+
+        self.stack.push(self.listing[pos].0.clone());
+
+        let path = self.fst.entries(self.stack.as_slice())
+            .and_then(|fst| fst.path() )
+            .unwrap()
+            .clone();
+
+        let prompt = format!(
+            "Really delete {} ? (y/N)",
+            path.to_str().unwrap()
+        );
+
+        self.rustbox.print(
+            0, 1, rustbox::Style::empty(),
+            rustbox::Color::White,
+            rustbox::Color::Default,
+            &prompt
+        );
+
+        self.rustbox.present();
+
+        match self.rustbox.poll_event(false) {
+            Ok(KeyEvent(Char('y'))) => {
+                self.fst.delete_path(self.stack.as_slice());
+                ()
+            },
+            _ => (),
+        }
+
+        self.stack.pop();
+        self.load();
     }
 
     fn selected(&self) -> &Option<usize> {
@@ -134,8 +173,6 @@ impl<'a> UI<'a> {
 
             *selected = new_selected;
         }
-
-        self.align_viewport();
     }
 
     // if the selected line has gone off the screen, we need to re-align the
