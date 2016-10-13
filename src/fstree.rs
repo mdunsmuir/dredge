@@ -263,7 +263,15 @@ impl FSTree {
     }
 
     fn delete(&self) -> std::io::Result<()> {
-        //Err(std::io::Error::new(std::io::ErrorKind::Other, "uh oh"))
-        Ok(())
+        match *self {
+            FSTree::Dir { ref path, .. } => fs::remove_dir_all(path),
+            FSTree::File { ref path, .. } => fs::remove_file(path),
+            _ => Err(
+                std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "Could not delete this entry"
+                )
+            ),
+        }
     }
 }
