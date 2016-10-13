@@ -13,6 +13,7 @@ pub struct Contents(BTreeMap<OsString, FSTree>);
 pub enum FSTree {
     Root {
         contents: Contents,
+        path: PathBuf,
         total_size: u64,
     },
 
@@ -109,7 +110,7 @@ macro_rules! variant_checker {
 impl FSTree {
 
     fst_accessor!(contents, Contents, Root, Dir);
-    fst_accessor!(path, std::path::PathBuf, Dir, File);
+    fst_accessor!(path, std::path::PathBuf, Root, Dir, File);
     fst_accessor!(metadata, std::fs::Metadata, Dir, File);
     fst_accessor!(total_size, u64, Root, Dir);
 
@@ -159,10 +160,13 @@ impl FSTree {
     }
 
     pub fn from_dir<P: AsRef<Path>>(path: P) -> Option<Self> {
+        let path_buf = path.as_ref().to_path_buf();
+
         Contents::from_path(path).map(|contents| {
             let size = contents.size();
             FSTree::Root {
                 contents: contents,
+                path: path_buf,
                 total_size: size,
             }
         })

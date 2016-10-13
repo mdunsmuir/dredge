@@ -83,7 +83,7 @@ impl<'a> UI<'a> {
                             self.stack.push(name);
                             self.selected.push(None);
                             self.load();
-                        }  
+                        }
                     }
                 }
 
@@ -169,7 +169,7 @@ impl<'a> UI<'a> {
                 let height = self.rustbox.height() - 1;
                 let last_index = // actually last index + 1
                     std::cmp::min((self.window_top + height), self.listing.len());
-                let to_display = 
+                let to_display =
                     &self.listing[self.window_top..last_index];
 
                 for (i, line) in to_display.iter().enumerate() {
@@ -183,8 +183,31 @@ impl<'a> UI<'a> {
     }
 
     fn draw_status_bar(&self, y: usize) {
-        let status_str = format!("Total Size: {}",
-                                 Self::format_size(self.fst.size().unwrap()));
+        let status_str = {
+            let root_path = self.fst.path().unwrap();
+            let root_size = self.fst.size().unwrap();
+
+            let cur_fst = self.fst.entries(self.stack.as_slice()).unwrap();
+            let cur_size = cur_fst.size().unwrap();
+            let cur_path = cur_fst.path().unwrap();
+
+            // if we're at the root, there's no path worth showing
+            if self.stack.is_empty() {
+                format!("{} : {}",
+                    root_path.to_str().unwrap(),
+                    Self::format_size(root_size),
+                )
+
+            } else {
+                format!(
+                    "{} : {} | {} : {}",
+                    root_path.to_str().unwrap(),
+                    Self::format_size(root_size),
+                    cur_path.to_str().unwrap(),
+                    Self::format_size(cur_size),
+                )
+            }
+        };
 
         self.rustbox.print(
             0, y, rustbox::Style::empty(),
@@ -213,9 +236,9 @@ impl<'a> UI<'a> {
         // create the string for the size and directory indicator
         let size_str = Self::format_size(size);
         let size_and_dir_marker = if is_dir {
-            format!("-> {:>}", size_str)
+            format!("-> {:>10}", size_str)
         } else {
-            format!("   {:>}", size_str)
+            format!("   {:>10}", size_str)
         };
 
         let size_str_x = self.rustbox.width() - size_and_dir_marker.len();
@@ -256,6 +279,6 @@ impl<'a> UI<'a> {
             _ => ('B', 0),
         };
 
-        format!("{:>10.1} {}", size as f64 / (1000.0 as f64).powi(power), prefix)
+        format!("{:>.1} {}", size as f64 / (1000.0 as f64).powi(power), prefix)
     }
 }
