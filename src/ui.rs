@@ -35,7 +35,7 @@ impl<'a> UI<'a> {
                                .and_then(|fst| fst.list() )
                                .unwrap();
 
-        self.listing.sort_by_key(|&(_, size, _)| size );
+        self.listing.sort_by_key(|&(_, size, _, _)| size );
         self.listing.reverse();
 
         if !self.listing.is_empty() { // if there are items to show
@@ -116,10 +116,14 @@ impl<'a> UI<'a> {
 
         self.stack.push(self.listing[pos].0.clone());
 
-        let path = self.fst.entries(self.stack.as_slice())
-            .and_then(|fst| fst.path() )
-            .unwrap()
-            .clone();
+        let path = {
+            let fst = self.fst.entries(self.stack.as_slice()).unwrap();
+            if fst.is_bad() {
+                return
+            } else {
+                fst.path().unwrap().clone()
+            }
+        };
 
         let prompt = format!(
             "Really delete {} ? (y/N)",
@@ -261,8 +265,6 @@ impl<'a> UI<'a> {
     }
 
     fn draw_line(&self, y: usize, selected: bool, listing: &Listing) {
-        let (ref name, size, is_dir) = *listing;
-
         // set colors depending on whether this line is selected
         let (front, back) = if selected {
             (rustbox::Color::Black, rustbox::Color::White)
@@ -270,36 +272,54 @@ impl<'a> UI<'a> {
             (rustbox::Color::Default, rustbox::Color::Default)
         };
 
-        // create the string for the size and directory indicator
-        let size_str = Self::format_size(size);
-        let size_and_dir_marker = if is_dir {
-            format!("-> {:>10}", size_str)
-        } else {
-            format!("   {:>10}", size_str)
-        };
+        let (name_part, size_and_dir_part) = self.format_listing(listing);
+        let size_str_x = self.rustbox.width() - size_and_dir_part.len();
 
-        let size_str_x = self.rustbox.width() - size_and_dir_marker.len();
-
-        // name on the left
+        // name on the right
         self.rustbox.print(
             0, y, rustbox::Style::empty(),
-            front, back, name.to_str().unwrap()
+            front, back, &name_part
         );
 
         // size on the right
         self.rustbox.print(
             size_str_x, y, rustbox::Style::empty(),
-            front, back, &size_and_dir_marker
+            front, back, &size_and_dir_part
         );
 
+        // and fill in the highlighted line if needed
         if selected {
-            for col in name.to_str().unwrap().len()..size_str_x {
+            for col in name_part.len()..size_str_x {
                 self.rustbox.print_char(
                     col, y, rustbox::Style::empty(),
                     front, back, ' '
                 )
             }
         }
+    }
+
+    fn format_listing(&self, listing: &Listing) -> (String, String) {
+        let (ref name, size, is_dir, ref symlink_target) = *listing;
+
+        // create the string for the size and directory indicator
+        let size_str = Self::format_size(size);
+        let size_and_dir_part = if is_dir {
+            format!("-> {:>10}", size_str)
+        } else {
+            format!("   {:>10}", size_str)
+        };
+
+        let name_part = if let Some(ref target) = *symlink_target {
+            format!(
+                "{} -> {}",
+                name.to_str().unwrap(),
+                target.to_str().unwrap()
+            )
+        } else {
+            String::from(name.to_str().unwrap())
+        };
+
+        (name_part, size_and_dir_part)
     }
 
     fn format_size(size: u64) -> String {

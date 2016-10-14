@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::fs;
 use super::os;
 
-pub type Listing = (OsString, u64, bool);
+pub type Listing = (OsString, u64, bool, Option<OsString>);
 
 pub struct Contents(BTreeMap<OsString, FSTree>);
 
@@ -27,6 +27,12 @@ pub enum FSTree {
     File {
         path: PathBuf,
         metadata: fs::Metadata,
+    },
+
+    Symlink {
+        path: PathBuf,
+        metadata: fs::Metadata,
+        target: PathBuf,
     },
 
     Bad,
@@ -110,8 +116,8 @@ macro_rules! variant_checker {
 impl FSTree {
 
     fst_accessor!(contents, Contents, Root, Dir);
-    fst_accessor!(path, std::path::PathBuf, Root, Dir, File);
-    fst_accessor!(metadata, std::fs::Metadata, Dir, File);
+    fst_accessor!(path, std::path::PathBuf, Root, Dir, File, Symlink);
+    fst_accessor!(metadata, std::fs::Metadata, Dir, File, Symlink);
     fst_accessor!(total_size, u64, Root, Dir);
 
     fst_accessor!(mut: contents_mut, contents, Contents, Root, Dir);
@@ -120,13 +126,14 @@ impl FSTree {
     variant_checker!(is_root, Root);
     variant_checker!(is_dir, Dir);
     variant_checker!(is_file, File);
+    variant_checker!(is_symlink, Symlink);
     variant_checker!(is_bad, Bad);
 
     /// Get the size of this object in bytes. `Bad` objects don't have any
     /// reportable size, hence the `Option`.
     pub fn size(&self) -> Option<u64> {
         self.total_size().cloned().or_else(||
-            if self.is_file() {
+            if self.is_file() || self.is_symlink() {
                 self.metadata().map(|md| os::size(md) )
             } else {
                 None
@@ -153,7 +160,17 @@ impl FSTree {
                     path: entry.path().clone(),
                     metadata: md,
                 })
-            } else {
+
+            } else if md.file_type().is_symlink() {
+                fs::read_link(entry.path()).map(|target|
+                    FSTree::Symlink {
+                        path: entry.path().clone(),
+                        metadata: md,
+                        target: target,
+                    }
+                ).ok()
+
+            } else { // not sure if this can even happen, but...
                 None
             }
         }).unwrap_or(FSTree::Bad)
@@ -178,7 +195,13 @@ impl FSTree {
                 (
                     name.clone(),
                     fst.size().unwrap_or(0),
-                    fst.is_dir()
+                    fst.is_dir(),
+
+                    if let FSTree::Symlink { ref target, .. } = *fst {
+                        Some(target.as_os_str().to_os_string())
+                    } else {
+                        None
+                    },
                 )
             ).collect()
         )
@@ -225,9 +248,11 @@ impl FSTree {
             let others = &names[1..];
 
             if names.len() == 1 { // delete from this level
-                let o_deleted_size = self.contents().map(|cs| cs.get_map() ).and_then(|map| {
-                    map.get(name)
-                }).and_then(|fst| {
+                let o_deleted_size = self.contents()
+                    .map(|cs| cs.get_map() )
+                    .and_then(|map| {map.get(name)})
+                    .and_then(|fst| {
+
                     let fst_size = fst.size();
                     fst.delete().ok().and_then(|_| fst_size )
                 });
@@ -266,6 +291,7 @@ impl FSTree {
         match *self {
             FSTree::Dir { ref path, .. } => fs::remove_dir_all(path),
             FSTree::File { ref path, .. } => fs::remove_file(path),
+            FSTree::Symlink { ref path, .. } => fs::remove_file(path),
             _ => Err(
                 std::io::Error::new(
                     std::io::ErrorKind::Other,
