@@ -158,7 +158,6 @@ impl<'a> UI<'a> {
             Ok(KeyEvent(Char('y'))) => {
                 self.rustbox.clear();
                 self.draw_status_bar(0);
-                self.rustbox.present();
 
                 self.rustbox.print(
                     0, 1, rustbox::Style::empty(),
@@ -167,6 +166,7 @@ impl<'a> UI<'a> {
                     "deleting... this may take a little while"
                 );
 
+                self.rustbox.present();
                 self.fst.delete_path(self.stack.as_slice());
                 ()
             },
