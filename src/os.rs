@@ -1,9 +1,14 @@
 use std::fs::Metadata;
 
-/// I'm still totally confused about where this comes from and couldn't find
-/// an API to grab it... maybe in system header files?
+/// I'm still not sure I totally understand the implications of hardcoding
+/// this to 512, but Google says I'm not the only one doing it so I don't
+/// feel too bad about it.
 ///
-/// ST_BLKSIZE returns the *IO* block size, which is 4096
+/// This value does seem to be available in `stat.h`, but getting it from
+/// there is not the easiest thing so I'm not going to bother for now.
+///
+/// TODO in the future: get this right, scrape this value out of whatever
+/// header file it's hiding in on all the platforms we want to support.
 const DEVICE_BLOCKSIZE: u64 = 512;
 
 // linux
@@ -25,3 +30,5 @@ use std::os::unix::fs::MetadataExt;
 pub fn size(metadata: &Metadata) -> u64 {
     metadata.blocks() * DEVICE_BLOCKSIZE
 }
+
+// windows... coming soon????

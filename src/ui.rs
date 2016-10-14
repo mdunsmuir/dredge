@@ -327,15 +327,15 @@ impl<'a> UI<'a> {
             return format!("{:>} {}", 0, 'B');
         }
 
-        let (prefix, power) = match (size as f64).log(1000.0).floor() as i32 {
-            0 => ('B', 0),
-            1 => ('K', 1),
-            2 => ('M', 2),
-            3 => ('G', 3),
-            x if x > 3 => ('T', 3),
-            _ => ('B', 0),
+        let (prefix, power) = match (size as f64).log(1024.0).floor() as i32 {
+            0 => ("B", 0),
+            1 => ("KiB", 1),
+            2 => ("MiB", 2),
+            3 => ("GiB", 3),
+            x if x > 3 => ("TiB", 4),
+            _ => ("B", 0),
         };
 
-        format!("{:>.1} {}", size as f64 / (1000.0 as f64).powi(power), prefix)
+        format!("{:>.1} {}", size as f64 / (1024.0 as f64).powi(power), prefix)
     }
 }
