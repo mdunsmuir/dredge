@@ -1,4 +1,7 @@
 # dredge
+
+[![Crates.io Status](https://img.shields.io/crates/v/dredge.svg)](https://crates.io/crates/dredge)
+
 A utility for inspecting disk usage in directory trees.
 
 ## Usage
