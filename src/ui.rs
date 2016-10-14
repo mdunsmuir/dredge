@@ -156,9 +156,21 @@ impl<'a> UI<'a> {
 
         match self.rustbox.poll_event(false) {
             Ok(KeyEvent(Char('y'))) => {
+                self.rustbox.clear();
+                self.draw_status_bar(0);
+                self.rustbox.present();
+
+                self.rustbox.print(
+                    0, 1, rustbox::Style::empty(),
+                    rustbox::Color::White,
+                    rustbox::Color::Default,
+                    "deleting... this may take a little while"
+                );
+
                 self.fst.delete_path(self.stack.as_slice());
                 ()
             },
+
             _ => (),
         }
 
