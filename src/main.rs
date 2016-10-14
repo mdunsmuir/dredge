@@ -25,10 +25,11 @@ pub use fstree::*;
 pub use ui::*;
 
 fn main() {
-    let args = clap_app!(app =>
+    let args = clap_app!(dredge =>
         (version: crate_version!())
-        (author: crate_authors!())
-        (about: "A tool to inspect and clean up directories and files")
+        (about: r#"A utility for inspecting disk usage in directory trees.
+
+hjkl for movement, q to quit, d to delete. See https://github.com/mdunsmuir/dredge for details."#)
         (@arg PATH: +required "The root directory to inspect")
     ).get_matches();
 
