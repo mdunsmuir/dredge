@@ -1,6 +1,6 @@
 [package]
 name = "dredge"
-version = "0.1.0"
+version = "0.1.1"
 description = "A utility for inspecting disk usage in directory trees."
 license = "GPL-3.0"
 authors = ["Michael Dunsmuir <mjdunsmuir@gmail.com>"]
@@ -11,6 +11,7 @@ include = [
     "Cargo.lock",
     "LICENSE",
     "README.md",
+    "CHANGELOG.md",
 ]
 
 [dependencies]
