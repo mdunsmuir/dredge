@@ -125,11 +125,15 @@ impl<'a> UI<'a> {
             Some(pos) => pos,
         };
 
+        // we'll show the item being deleted in the status bar
+        // this is a bit of a cheat becuase we need it to be on the stack
+        // anyway for the rest of this method to work, but we'll push it
+        // now to keep the UI looking consistent during deletion
+        self.stack.push(self.listing[pos].0.clone());
+
         // clear screen and show the prompt
         self.rustbox.clear();
         self.draw_status_bar(0);
-
-        self.stack.push(self.listing[pos].0.clone());
 
         let path = {
             let fst = self.fst.entries(self.stack.as_slice()).unwrap();
@@ -147,7 +151,7 @@ impl<'a> UI<'a> {
 
         self.rustbox.print(
             0, 1, rustbox::Style::empty(),
-            rustbox::Color::White,
+            rustbox::Color::Default,
             rustbox::Color::Default,
             &prompt
         );
@@ -161,7 +165,7 @@ impl<'a> UI<'a> {
 
                 self.rustbox.print(
                     0, 1, rustbox::Style::empty(),
-                    rustbox::Color::White,
+                    rustbox::Color::Default,
                     rustbox::Color::Default,
                     "deleting... this may take a little while"
                 );
