@@ -300,7 +300,10 @@ impl<'a> UI<'a> {
         };
 
         let (name_part, size_and_dir_part) = self.format_listing(listing);
-        let size_str_x = self.rustbox.width() - size_and_dir_part.len();
+        let size_str_x = std::cmp::max(
+            0,
+            self.rustbox.width() as i64 - size_and_dir_part.len() as i64,
+        ) as usize;
 
         // name on the right
         self.rustbox.print(
