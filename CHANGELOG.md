@@ -9,3 +9,5 @@ is based on [Keep a Changelog](http://keepachangelog.com/).
 
 - Fixed hang when terminal is shrunk to a very small size
 - Deletion UI cosmetic improvements
+
+[0.1.1]: https://github.com/mdunsmuir/dredge/compare/0.1.0...0.1.1
